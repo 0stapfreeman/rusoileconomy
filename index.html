@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/scrollama"></script>
+
+    <script src="js/circles-chart.js"></script>
+    <script src="js/treemap.js"></script>
+    <script src="js/gas.js"></script>
+    <script src="js/pie-chart.js"></script>
+    <script src="js/drawMap.js"></script>
+    <script src="js/finance-chart.js"></script>
+
+    <script src="js/script.js"></script>
+    <style>
+        body { margin: 0; font-family: sans-serif; background: #f9f9f9; }
+        
+        .static-scroll {
+            position: relative;
+            z-index: 10; 
+            background: white; 
+            padding: 100px 0;
+        }
+
+        .prose-max {
+            max-width: 750px;
+            margin: 0 auto;
+        }
+
+        /* Секція з картою */
+        .scrolly-container {
+            position: relative;
+            z-index: 1; /* Нижче за сувої */
+        }
+
+        .sticky-viz {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+        }
+
+        /* Прозорі кроки поверх карти */
+        .prose-steps {
+            position: relative;
+            z-index: 5;
+            pointer-events: none; /* Щоб можна було "клікати" крізь них на карту, якщо треба */
+        }
+
+        .step {
+            height: 100vh; /* Кожен крок займає весь екран */
+            display: flex;
+            align-items: center;
+            justify-content: flex-start; /* Виноска зліва */
+            padding-left: 10vw;
+        }
+
+.step-content {
+    pointer-events: auto;
+    background: rgba(255, 255, 255, 0.75);
+    padding: 24px;
+    max-width: 380px;
+    
+    max-height: 70vh; 
+    overflow-y: auto; 
+    
+    border: 1px solid rgba(224, 224, 224, 0.5);
+    border-radius: 4px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    font-family: 'Inter', sans-serif;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+/* Стилізація скролбару для Chrome/Safari */
+.step-content::-webkit-scrollbar {
+    width: 6px;
+}
+.step-content::-webkit-scrollbar-thumb {
+    background-color: rgba(227, 26, 28, 0.4);
+    border-radius: 10px;
+}
+
+/* Гарантуємо, що тултіп завжди над усім */
+#map-exclusive-tooltip {
+    z-index: 99999 !important;
+}
+
+        /* Додамо також невелику правку для кроків, щоб вони плавно з'являлися */
+        .step {
+            opacity: 0.3;
+            transition: opacity 0.5s ease;
+        }
+
+        .step.active {
+            opacity: 1;
+        }
+
+        .step-content h2 {
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 0;
+            color: #e31a1c; /* Червоний тільки для заголовка */
+        }
+
+        .step-content p {
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+
+        .viz-container {
+            width: 100%;
+            max-width: 900px;
+            margin: 2rem auto;
+            overflow: visible;
+        }
+
+        /* Обмежуємо висоту treemap, щоб він не домінував над іншими */
+        .small-treemap svg {
+            max-height: 450px; 
+        }
+
+        /* Update tooltip styles to ensure visibility */
+        .oil-tooltip, #map-specific-tooltip {
+            position: absolute;
+            visibility: hidden;
+            background: rgba(255, 255, 255, 0.98);
+            color: #333;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.4;
+            z-index: 1000;
+            pointer-events: none;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            border-left: 4px solid #e31a1c; /* Червона лінія для акценту */
+            min-width: 180px;
+        }
+
+        .oil-tooltip b {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 4px;
+            color: #000;
+        }
+
+        .oil-tooltip .meta {
+            color: #666;
+            font-size: 12px;
+        }
+
+        #map-exclusive-tooltip {
+            position: absolute;
+            visibility: hidden;
+            background: #ffffff;
+            color: #333333;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.4;
+            z-index: 10001; /* Вище за всі інші елементи */
+            pointer-events: none;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            border-left: 5px solid #e31a1c; /* Червоний акцент */
+            min-width: 200px;
+        }
+
+        #map-exclusive-tooltip b {
+            display: block;
+            font-size: 15px;
+            margin-bottom: 4px;
+            color: #000000;
+        }
+
+        #map-exclusive-tooltip hr {
+            border: 0;
+            border-top: 1px solid #eeeeee;
+            margin: 8px 0;
+        }
+
+        .country-pie-group path {
+            stroke: #fff;
+            stroke-width: 0.5px;
+        }
+
+        .country-pie-group:hover path {
+            filter: brightness(0.9);
+        }
+
+        .prose-max p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #444;
+            text-align: justify; /* Для солідності */
+        }
+    </style>
+</head>
+<body>
+
+   <article class="static-scroll">
+        <div class="prose-max">
+            <h1>Ахіллесова п'ята Російської Федерації</h1>
+
+            <p style="font-size: 0.9rem; color: #666; margin-top: -1.5rem; margin-bottom: 2rem;">
+            Візуальне розслідування: <strong>Остап Іваночко</strong> | Квітень 2026
+            </p>
+            <p>Напередодні повномасштабного вторгнення Росія вибудувала стратегію «Фортеця Росія», яка базувалася на безпрецедентній фінансовій автономії. Ключовим елементом стали колосальні резерви, що мали захистити економіку від будь-якого зовнішнього тиску.</p>
+            
+            <div id="viz-wealth"></div> 
+
+            <p>Міжнародні резерви (ЗВР) сягнули <b>$630 млрд</b>. Особливу роль відігравав золотий запас ($132 млрд), який зберігався всередині країни. Водночас понад $460 млрд валютних активів розміщувалися в іноземних банках, що згодом дозволило Заходу заморозити майже половину всієї «фортеці».</p>
+            
+            <hr style="margin: 4rem 0; border: 0; border-top: 1px solid #eee;">
+
+            <p>Фундаментом цієї автономії були надприбутки від енергоносіїв. Структура бюджету РФ на січень 2022 року чітко демонструє критичну залежність держави від експорту сировини.</p>
+
+            <div id="viz-budget"></div>
+
+            <p><b>Нафтогазові доходи</b> становили понад третину всього бюджету. Разом із ПДВ, який також значною мірою генерується через споживання за рахунок нафтодоларів, ці два джерела формували основу військової машини Кремля.</p>
+
+            <hr style="margin: 4rem 0; border: 0; border-top: 1px solid #eee;">
+
+            <p>Щоб зрозуміти вагу Росії в глобальному контексті, варто поглянути на її частку у світовому видобутку. Вона залишається одним із трьох найбільших виробників нафти у світі.</p>
+
+            <div id="viz-pie"></div> 
+
+            <p>Росія забезпечувала понад <b>11% світового видобутку</b>. Як провідний учасник групи OPEC+, вона отримала інструмент впливу на світові ціни, використовуючи енергію як геополітичну зброю ще до початку відкритих бойових дій.</p>
+        </div>
+    </article>
+
+    
+   <div id="scrolly-map-1" class="scrolly-container">
+    <div class="sticky-viz">
+        <div id="map-area-1"></div> 
+    </div>
+
+    <div class="prose-steps">
+        <section class="step" data-step="0">
+            <div class="step-content">
+                <h2>Логістика сирої нафти</h2>
+                <p>Ключові морські термінали та порти. Через ці точки Росія відвантажує нафту танкерами на глобальні ринки, намагаючись обійти сухопутні обмеження.</p>
+            </div>
+        </section>
+
+        <section class="step" data-step="1">
+            <div class="step-content">
+                <h2>Нафтопереробка (НПЗ)</h2>
+                <p>Заводи, що перетворюють сировину на паливо. Це критична інфраструктура, яка забезпечує внутрішній ринок та армію, а також генерує додану вартість при експорті нафтопродуктів.</p>
+            </div>
+        </section>
+
+        <section class="step" data-step="2">
+            <div class="step-content">
+                <h2>Газова інфраструктура</h2>
+                <p>Заводи зі зрідження природного газу (ЗПГ) та магістральні газопроводи. Попри санкції, цей сектор залишається технологічно складним та важливим для експорту в Азію та ЄС.</p>
+            </div>
+        </section>
+
+        <section class="step" data-step="3">
+            <div class="step-content">
+                <h2>Енергетичний каркас РФ</h2>
+                <p>Повна мережа об'єктів енергетики. Видно масштаби залежності економіки від видобутку та транспортування сировини, що робить ці об'єкти головними цілями економічного тиску.</p>
+            </div>
+        </section>
+    </div>
+</div>
+
+    <article class="static-scroll">
+        <div class="prose-max">
+            <h2>Ефект санкцій та майбутнє</h2>
+            <p>Починаючи з 2023 року, архітектура «Енергетичної фортеці», яку Росія будувала десятиліттями, почала давати системні збої під тиском нафтового ембарго та цінових обмежень G7. Якщо раніше енергоресурси були інструментом геополітичного впливу на Європу, то тепер вони перетворилися на тягар, що потребує складних логістичних маневрів для виживання.
+
+Заморозка суверенних активів та технологічна ізоляція змусили Кремль радикально переглянути маршрути експорту. Тепер стабільність російського бюджету залежить не від довгострокових контрактів з ЄС, а від мінливої кон'юнктури азійських ринків та здатності утримувати «тіньовий флот» танкерів. Наступна карта демонструє цю геополітичну трансформацію: як за чотири роки Росія пройшла шлях від головного постачальника Європи до критичної залежності від нових центрів сили</p>
+        </div>
+    </article>
+
+    <div id="scrolly-map-2" class="scrolly-container">
+        <div class="sticky-viz">
+            <div id="map-area-2"></div> 
+        </div>
+
+        <div class="prose-steps">
+            <section class="step" data-step="0">
+                <div class="step-content">
+                    <h2>2021-22: Енергетична голка</h2>
+                    <p>Росія роками вибудовувала монополію на ринку ЄС, використовуючи газ як інструмент політичного тиску. Німеччина та Австрія стали головними заручниками дешевих трубних ресурсів.</p>
+                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
+                        • <b>Лютий 2022:</b> Вторгнення та негайне замороження <b>$300 млрд</b> золотовалютних резервів РФ на Заході.<br>
+                        • <b>Березень 2022:</b> США та Британія вводять першу повну заборону на імпорт російської нафти.
+                    </div>
+                </div>
+            </section>
+
+            <section class="step" data-step="1">
+                <div class="step-content">
+                    <h2>2023: Великий розворот</h2>
+                    <p>Ембарго змусило РФ шукати порятунку в Азії. Нафта перенаправляється до Індії та Китаю з величезними знижками, щоб наповнити військовий бюджет.</p>
+                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
+                        • <b>Лютий:</b> Повне морське ембарго ЄС на нафтопродукти.<br>
+                        • <b>Травень:</b> Перші масштабні атаки українських дронів на нафтобази РФ.<br>
+                        • <b>Грудень:</b> Початок обговорення в G7 механізму конфіскації прибутків від активів РФ.
+                    </div>
+                </div>
+            </section>
+
+            <section class="step" data-step="2">
+                <div class="step-content">
+                    <h2>2024: Тіньова експансія</h2>
+                    <p>Кремль адаптується через «тіньовий флот» танкерів. Росія захоплює ринок дизеля в Бразилії, витісняючи США, та нарощує присутність в Африці.</p>
+                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
+                        • <b>Травень:</b> ЄС ухвалює план використання надприбутків від активів РФ для озброєння України.<br>
+                        • <b>Червень:</b> G7 погоджує кредит Україні на <b>$50 млрд</b> під заставу майбутніх прибутків від рос. активів.
+                    </div>
+                </div>
+            </section>
+
+            <section class="step" data-step="3">
+                <div class="step-content">
+                    <h2>2025: Азійська пастка</h2>
+                    <p>Залежність Індії та Китаю від російської сировини стає тотальною. Європа залишає РФ лише роль постачальника ЗПГ через «лазівки» в портах.</p>
+                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
+                        • <b>Січень:</b> Зупинка транзиту газу через Україну. Остаточне обнулення газових доходів «Газпрому» в ЄС.<br>
+                        • <b>Квітень:</b> США конфісковують перші російські суверенні активи згідно з актом REPO.
+                    </div>
+                </div>
+            </section>
+
+            <section class="step" data-step="4">
+                <div class="step-content">
+                    <h2>2026: Нова кон'юнктура</h2>
+                    <p>Станом на початок року Росія остаточно втратила статус «енергетичної супердержави». Експортні доходи тепер критично залежать від диктату цін Пекіном.</p>
+                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
+                        • <b>Січень:</b> Західні банки масово блокують платежі за нафту через страх вторинних санкцій.<br>
+                        • <b>Березень:</b> Перша виплата Україні основної суми тіла кредиту за рахунок активів РФ.
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+<article class="static-scroll">
+    <div class="prose-max">
+        <div id="viz-finance-evolution" class="viz-container"></div>
+        <p style="margin-top: 2rem; font-style: italic; color: #666; font-size: 0.9rem;">
+            * Ця візуалізація демонструє критичний розрив між видатками на війну та реальними доходами, 
+            що змушує агресора спалювати ліквідні запаси ФНБ.
+        </p>
+    </div>
+</article>
+
+
+<script>
+    let infrastructureData = [];
+    const w = 1000;
+    const h = 600;
+
+    let sharesData = [];
+    const countryCoords = {
+        "Німеччина": [10.45, 51.16],
+        "Франція": [2.21, 46.22],
+        "Італія": [12.56, 41.87],
+        "Австрія": [14.55, 47.51],
+        "Угорщина": [19.50, 47.16],
+        "Словаччина": [19.69, 48.66],
+        "Чехія": [15.47, 49.81],
+        "Польща": [19.14, 51.91],
+        "Іспанія": [-3.74, 40.46],
+        "Бельгія": [4.46, 50.50],
+        "Нідерланди": [5.29, 52.13],
+        "Греція": [21.82, 39.07],
+        "Болгарія": [25.48, 42.73],
+        "Фінляндія": [25.74, 61.92],
+        "Литва/Латвія": [23.88, 55.16],
+        "Естонія": [25.01, 58.59],
+        "Китай": [104.19, 35.86],
+        "Індія": [78.96, 20.59],
+        "Туреччина": [35.24, 38.96],
+        "Японія": [138.25, 36.20],
+        "Бразилія": [-50.92, -0.23]
+    };
+    // Налаштування для пирогів (поза функціями)
+    const pieGenerator = d3.pie()
+        .value(d => d.value)
+        .sort(null)
+        .startAngle(-Math.PI / 2)
+        .endAngle(Math.PI * 1.5);
+
+    const arcGenerator = d3.arc()
+        .innerRadius(0)
+        .outerRadius(10);
+
+
+    const scroller2 = scrollama();
+    
+    const svg = d3.select("#map-area-1").append("svg")
+        .attr("viewBox", [0, 0, w, h])
+        .style("width", "100%")
+        .style("height", "auto");
+
+    const gMap = svg.append("g").attr("class", "map-layer");
+    const gPipes = svg.append("g").attr("id", "pipes-group"); 
+    const gPoints = svg.append("g").attr("class", "points-layer");
+    
+    const mapTip = d3.select("body").append("div").attr("id", "map-exclusive-tooltip");
+
+    const mapProjection = d3.geoMercator()
+        .scale(w / 3.2) 
+        .center([55, 55]) 
+        .translate([w / 2, h / 2]);
+
+
+    function drawPoints(filterType = "all") {
+        let filtered;
+        if (filterType === "all") {
+            filtered = infrastructureData;
+        } else if (filterType === "Нафта") {
+            // Тільки сира нафта (Логістика - порти)
+            filtered = infrastructureData.filter(d => d.sector.includes("Логістика") && !d.name.includes("нафтопродукт"));
+        } else if (filterType === "Нафтопродукти") {
+            // Тільки переробка (НПЗ)
+            filtered = infrastructureData.filter(d => d.sector.includes("НПЗ"));
+        } else if (filterType === "ЗПГ") {
+            filtered = infrastructureData.filter(d => d.sector.includes("ЗПГ"));
+        }
+
+        const circles = gPoints.selectAll("circle")
+            .data(filtered, d => d.name);
+
+        circles.exit().transition().duration(500).attr("r", 0).remove();
+
+        circles.enter()
+    .append("circle")
+    .attr("class", "infra-point")
+    .attr("cx", d => {
+        const p = mapProjection(d.coords);
+        return p ? p[0] : -1000; // Фікс "точки в кутку"
+    })
+    .attr("cy", d => {
+        const p = mapProjection(d.coords);
+        return p ? p[1] : -1000;
+    })
+    .attr("r", 0)
+    .style("pointer-events", "all")
+    .attr("fill", d => {
+        if (d.sector.includes("НПЗ")) return "#e31a1c"; // Червоний
+        if (d.sector.includes("Логістика")) return "#000000"; // Чорний
+        if (d.sector.includes("ЗПГ")) return "#f1c40f"; // Жовтий
+        return "#777";
+    })
+    .attr("stroke", "#fff")
+    .attr("stroke-width", 1.5)
+    .style("opacity", 0.9)
+    .on("mouseover", function(event, d) {
+        // Ефект при наведенні: чорний контур і повна непрозорість
+        d3.select(this).transition().duration(100)
+            .attr("stroke", "#000")
+            .attr("stroke-width", 2.5)
+            .style("opacity", 1);
+        
+        mapTip.style("visibility", "visible")
+            .html(`
+                <b>${d.name}</b>
+                <div style="color: #666; font-size: 11px; text-transform: uppercase;">${d.role}</div>
+                <hr>
+                <div style="margin-bottom: 3px;">Сектор: <strong>${d.sector}</strong></div>
+                <div>Потужність: <strong>${d.value}</strong> ${d.units}</div>
+                <div style="margin-top: 3px; font-size: 11px; color: #888;">Частка: ${d.share}%</div>
+            `);
+    })
+    .on("mousemove", function(event) {
+        // Позиціонування відносно курсора
+        mapTip.style("top", (event.pageY - 10) + "px")
+              .style("left", (event.pageX + 20) + "px");
+    })
+    .on("mouseout", function() {
+        // Повертаємо початковий стан
+        d3.select(this).transition().duration(100)
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 1.5)
+            .style("opacity", 0.9);
+            
+        mapTip.style("visibility", "hidden");
+    })
+    .transition()
+    .duration(800)
+    .attr("r", d => Math.sqrt(d.value) * 1.8);
+    }
+
+    function animatePipes(filterType = "all") {
+        const lineGen = d3.line()
+            .x(d => mapProjection([d[1], d[0]])[0]) 
+            .y(d => mapProjection([d[1], d[0]])[1])
+            .curve(d3.curveBundle.beta(0.5));
+
+        const druzhbaCoords = [[54.92, 52.21], [53.08, 50.25], [52.50, 32.01], [49.02, 23.50]];
+        const gasPipeCoords = [[59.51, 28.25], [57.00, 35.00], [53.00, 30.00], [50.00, 20.00]];
+
+        const allPipes = [
+            { name: "Дружба", type: "Нафта", coords: druzhbaCoords, color: "#000000" },
+            { name: "Північний Потік", type: "ЗПГ", coords: gasPipeCoords, color: "#f1c40f" }
+        ];
+
+        const filteredPipes = filterType === "all" 
+            ? allPipes 
+            : allPipes.filter(p => p.type === filterType);
+
+        const paths = gPipes.selectAll(".pipe")
+            .data(filteredPipes, d => d.name);
+
+        paths.exit().transition().duration(500).style("opacity", 0).remove();
+
+        paths.enter()
+            .append("path")
+            .attr("class", "pipe")
+            .attr("d", d => lineGen(d.coords))
+            .attr("fill", "none")
+            .attr("stroke", d => d.color)
+            .attr("stroke-width", 3)
+            .attr("stroke-dasharray", function() { return this.getTotalLength(); })
+            .attr("stroke-dashoffset", function() { return this.getTotalLength(); })
+            .transition()
+            .duration(2000)
+            .attr("stroke-dashoffset", 0);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    // --- НАЛАШТУВАННЯ ДЛЯ ДРУГОЇ КАРТИ (ГЛОБАЛЬНОЇ) ---
+const svg2 = d3.select("#map-area-2").append("svg")
+    .attr("viewBox", [0, 0, w, h])
+    .style("width", "100%")
+    .style("height", "auto");
+
+const projection2 = d3.geoNaturalEarth1() 
+    .scale(130*3) 
+    .translate([w / 2 - 100, h / 2 + 210]); 
+
+const gMap2 = svg2.append("g").attr("class", "countries-layer");
+const gPies2 = svg2.append("g").attr("class", "pies-layer");
+
+async function initMap2() {
+    const path = d3.geoPath().projection(projection2);
+    // Використовуємо надійне джерело геоданих
+    const world = await d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson");
+    
+    gMap2.selectAll("path")
+        .data(world.features)
+        .join("path")
+        .attr("d", path)
+        .attr("fill", "#f0f0f0")
+        .attr("stroke", "#ffffff")
+        .attr("stroke-width", 0.5);
+}
+
+function drawSharesPies(year) {
+    const validData = sharesData.filter(d => countryCoords[d.Країна]);
+
+    const countryGroups = gPies2.selectAll(".country-pie-group")
+        .data(validData, d => d.Країна);
+
+    const countryEnter = countryGroups.enter()
+        .append("g")
+        .attr("class", "country-pie-group")
+        .attr("transform", d => {
+            const p = projection2(countryCoords[d.Країна]);
+            return `translate(${p[0]}, ${p[1]})`;
+        });
+
+    const allGroups = countryEnter.merge(countryGroups);
+
+    // Оновлюємо шляхи (path) для КОЖНОЇ країни
+    allGroups.each(function(d) {
+        const russianShare = +d[year];
+        const pieData = [
+            { label: "RU", value: russianShare, color: "#e31a1c" },
+            { label: "Other", value: 100 - russianShare, color: "#dddddd" }
+        ];
+
+        // Генеруємо дані для секторів
+        const arcs = pieGenerator(pieData);
+
+        // Вибираємо пати всередині поточної групи g
+        const paths = d3.select(this).selectAll("path")
+            .data(arcs);
+
+        paths.join(
+            enter => enter.append("path")
+                .attr("fill", p => p.data.color)
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 0.5)
+                .each(function(p) { this._current = p; }) // Зберігаємо початковий стан
+                .attr("d", arcGenerator),
+            update => update
+                .transition()
+                .duration(750)
+                .attrTween("d", function(a) {
+                    // Анімація: перехід від старого стану (this._current) до нового (a)
+                    const i = d3.interpolate(this._current, a);
+                    this._current = i(0);
+                    return t => arcGenerator(i(t));
+                })
+        );
+
+        // Оновлюємо тултіп на самій групі g
+        d3.select(this)
+            .on("mouseover", function(event) {
+                mapTip.style("visibility", "visible")
+                    .html(`<b>${d.Країна}</b><br>Рік: ${year}<hr>Частка РФ: <strong>${russianShare}%</strong>`);
+            })
+            .on("mousemove", function(event) {
+                mapTip.style("top", (event.pageY - 15) + "px")
+                      .style("left", (event.pageX + 15) + "px");
+            })
+            .on("mouseout", () => mapTip.style("visibility", "hidden"));
+    });
+}
+
+
+
+
+
+
+
+
+    const scroller = scrollama();
+
+    function handleStepEnter(response) {
+        d3.selectAll('.step').classed('active', (d, i) => i === response.index);
+
+        // ПОРЯДОК: Нафта -> Нафтопродукти -> ЗПГ
+        if (response.index === 0) {
+            animatePipes("Нафта"); // Чорна Дружба
+            drawPoints("Нафта");   // Чорні порти
+        } else if (response.index === 1) {
+            animatePipes("none");  // Нафтопродукти не мають великих експортних труб у вашій схемі
+            drawPoints("Нафтопродукти"); // Червоні НПЗ
+        } else if (response.index === 2) {
+            animatePipes("ЗПГ");   // Жовта труба
+            drawPoints("ЗПГ");     // Жовті заводи
+        } else if (response.index === 3) {
+            animatePipes("all");
+            drawPoints("all");
+        }
+    }
+
+
+
+    function handleStepEnter2(response) {
+        const years = ["2021", "2023", "2024", "2025", "2026"];
+        const targetYear = years[response.index];
+        
+        console.log("Скрол до року:", targetYear); // Перевірте в консолі F12
+        if (targetYear) {
+            drawSharesPies(targetYear);
+        }
+    }
+
+    async function init() {
+        try {
+            const rawData = await d3.csv("data/Infrastructure.csv");
+            infrastructureData = rawData.map(d => {
+                const coordsArray = d["Координати (WGS84)"].split(",").map(Number);
+                return {
+                    name: d["Тип об’єкта / Назва"],
+                    sector: d["Сектор"],
+                    role: d["Роль"],
+                    value: +d["Абсолютне значення"],
+                    units: d["Одиниці виміру"],
+                    share: +d["Частка в секторі (%)"],
+                    coords: [coordsArray[1], coordsArray[0]] 
+                };
+            });
+
+            await drawWealth("#viz-wealth");
+            await drawBudget("#viz-budget");
+            await drawPie("#viz-pie", mapTip);
+            await drawMap();
+            await drawFinanceEvolution("#viz-finance-evolution");
+
+
+           scroller.setup({ 
+                step: "#scrolly-map-1 .step", // Додаємо ID першої карти
+                offset: 0.7, 
+                debug: false 
+            }).onStepEnter(handleStepEnter);
+
+
+
+
+
+            sharesData = await d3.csv("data/RussianOilSuckers.csv");
+
+            await initMap2();
+            drawSharesPies("2021"); // Малюємо початковий стан
+
+            scroller2.setup({
+                step: "#scrolly-map-2 .step", // Додаємо ID другої карти
+                offset: 0.7,
+                debug: false
+            }).onStepEnter(handleStepEnter2);
+
+
+
+
+            window.addEventListener("resize", () => {
+                scroller.resize();
+                scroller2.resize();
+            });
+        } catch (e) { console.error(e); }
+    }
+
+    init();
+</script>
+</body>
+</html>
