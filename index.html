@@ -38,6 +38,7 @@
             position: sticky;
             top: 0;
             height: 100vh;
+            z-index: 1;
         }
 
         /* Прозорі кроки поверх карти */
@@ -86,9 +87,8 @@
     z-index: 99999 !important;
 }
 
-        /* Додамо також невелику правку для кроків, щоб вони плавно з'являлися */
         .step {
-            opacity: 0.3;
+            opacity: 0.7;
             transition: opacity 0.5s ease;
         }
 
@@ -198,6 +198,45 @@
             color: #444;
             text-align: justify; /* Для солідності */
         }
+
+      
+        
+        /* Базовий стиль для всіх кроків */
+.step {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding-left: 10vw;
+    transition: opacity 0.5s ease;
+}
+
+/* Специфічні стилі для другої карти */
+.map-2-content {
+    border-left: 5px solid #e31a1c; /* Червона лінія зліва для акценту */
+    background: rgba(255, 255, 255, 0.85) !important; /* Трохи щільніший фон */
+}
+
+/* Стиль для активного кроку другої карти */
+.step.map-2-step.active {
+    opacity: 1;
+}
+
+.step.map-2-step.active .map-2-content {
+    box-shadow: 0 15px 35px rgba(0,0,0,0.12);
+    transform: translateY(0);
+}
+
+.event-details {
+    font-size: 12px; 
+    color: #666; 
+    border-top: 1px solid #eee; 
+    padding-top: 8px;
+    margin-top: 10px;
+}
+
+/* Гарантуємо правильний порядок накладання */
+#scrolly-map-1 { z-index: 10; }
+#scrolly-map-2 { z-index: 11; }
     </style>
 </head>
 <body>
@@ -279,69 +318,52 @@
         </div>
     </article>
 
-    <div id="scrolly-map-2" class="scrolly-container">
-        <div class="sticky-viz">
-            <div id="map-area-2"></div> 
-        </div>
-
-        <div class="prose-steps">
-            <section class="step" data-step="0">
-                <div class="step-content">
-                    <h2>2021-22: Енергетична голка</h2>
-                    <p>Росія роками вибудовувала монополію на ринку ЄС, використовуючи газ як інструмент політичного тиску. Німеччина та Австрія стали головними заручниками дешевих трубних ресурсів.</p>
-                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
-                        • <b>Лютий 2022:</b> Вторгнення та негайне замороження <b>$300 млрд</b> золотовалютних резервів РФ на Заході.<br>
-                        • <b>Березень 2022:</b> США та Британія вводять першу повну заборону на імпорт російської нафти.
-                    </div>
-                </div>
-            </section>
-
-            <section class="step" data-step="1">
-                <div class="step-content">
-                    <h2>2023: Великий розворот</h2>
-                    <p>Ембарго змусило РФ шукати порятунку в Азії. Нафта перенаправляється до Індії та Китаю з величезними знижками, щоб наповнити військовий бюджет.</p>
-                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
-                        • <b>Лютий:</b> Повне морське ембарго ЄС на нафтопродукти.<br>
-                        • <b>Травень:</b> Перші масштабні атаки українських дронів на нафтобази РФ.<br>
-                        • <b>Грудень:</b> Початок обговорення в G7 механізму конфіскації прибутків від активів РФ.
-                    </div>
-                </div>
-            </section>
-
-            <section class="step" data-step="2">
-                <div class="step-content">
-                    <h2>2024: Тіньова експансія</h2>
-                    <p>Кремль адаптується через «тіньовий флот» танкерів. Росія захоплює ринок дизеля в Бразилії, витісняючи США, та нарощує присутність в Африці.</p>
-                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
-                        • <b>Травень:</b> ЄС ухвалює план використання надприбутків від активів РФ для озброєння України.<br>
-                        • <b>Червень:</b> G7 погоджує кредит Україні на <b>$50 млрд</b> під заставу майбутніх прибутків від рос. активів.
-                    </div>
-                </div>
-            </section>
-
-            <section class="step" data-step="3">
-                <div class="step-content">
-                    <h2>2025: Азійська пастка</h2>
-                    <p>Залежність Індії та Китаю від російської сировини стає тотальною. Європа залишає РФ лише роль постачальника ЗПГ через «лазівки» в портах.</p>
-                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
-                        • <b>Січень:</b> Зупинка транзиту газу через Україну. Остаточне обнулення газових доходів «Газпрому» в ЄС.<br>
-                        • <b>Квітень:</b> США конфісковують перші російські суверенні активи згідно з актом REPO.
-                    </div>
-                </div>
-            </section>
-
-            <section class="step" data-step="4">
-                <div class="step-content">
-                    <h2>2026: Нова кон'юнктура</h2>
-                    <p>Станом на початок року Росія остаточно втратила статус «енергетичної супердержави». Експортні доходи тепер критично залежать від диктату цін Пекіном.</p>
-                    <div style="font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 8px;">
-                        • <b>Січень:</b> Західні банки масово блокують платежі за нафту через страх вторинних санкцій.<br>
-                        • <b>Березень:</b> Перша виплата Україні основної суми тіла кредиту за рахунок активів РФ.
-                    </div>
-                </div>
-            </section>
-        </div>
+   <div id="scrolly-map-2" class="scrolly-container">
+    <div class="sticky-viz">
+        <div id="map-area-2"></div> 
     </div>
+
+    <div class="prose-steps">
+        <section class="step map-2-step" data-step="0">
+            <div class="step-content map-2-content">
+                <h2>2021-22: Енергетична голка</h2>
+                <p>Росія роками вибудовувала монополію на ринку ЄС. Німеччина та Австрія стали головними заручниками дешевих ресурсів.</p>
+                <div class="event-details">
+                    • <b>Лютий 2022:</b> Замороження <b>$300 млрд</b> активів РФ.<br>
+                    • <b>Березень 2022:</b> Перша заборона імпорту США.
+                </div>
+            </div>
+        </section>
+
+        <section class="step map-2-step" data-step="1">
+            <div class="step-content map-2-content">
+                <h2>2023: Великий розворот</h2>
+                <p>Ембарго змусило РФ шукати порятунку в Азії. Нафта йде до Індії та Китаю з величезними знижками.</p>
+            </div>
+        </section>
+
+        <section class="step map-2-step" data-step="2">
+            <div class="step-content map-2-content">
+                <h2>2024: Тіньова експансія</h2>
+                <p>Кремль адаптується через «тіньовий флот». Росія захоплює ринок дизеля в Бразилії, витісняючи традиційних гравців.</p>
+            </div>
+        </section>
+
+        <section class="step map-2-step" data-step="3">
+            <div class="step-content map-2-content">
+                <h2>2025: Азійська пастка</h2>
+                <p>Залежність від Китаю стає тотальною. Зупинка транзиту газу через Україну обнуляє доходи Газпрому в ЄС.</p>
+            </div>
+        </section>
+
+        <section class="step map-2-step" data-step="4">
+            <div class="step-content map-2-content">
+                <h2>2026: Нова кон'юнктура</h2>
+                <p>Станом на початок року Росія остаточно втратила статус енергетичної супердержави. Доходи залежать від диктату Пекіна.</p>
+            </div>
+        </section>
+    </div>
+</div>
 
 <article class="static-scroll">
     <div class="prose-max">
@@ -708,7 +730,7 @@ function drawSharesPies(year) {
             drawSharesPies("2021"); // Малюємо початковий стан
 
             scroller2.setup({
-                step: "#scrolly-map-2 .step", // Додаємо ID другої карти
+                step: "#scrolly-map-2 .map-2-step", // Використовуємо новий клас
                 offset: 0.7,
                 debug: false
             }).onStepEnter(handleStepEnter2);
