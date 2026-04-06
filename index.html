@@ -247,6 +247,52 @@
         height: 120vh; /* Робимо кроки довшими на низьких екранах, щоб текст встиг прочитатися */
     }
 }
+
+
+/* Адаптивність для планшетів та смартфонів */
+@media (max-width: 1024px) {
+    .step {
+        padding-left: 5vw;
+        justify-content: center; /* Центруємо картки на малих екранах */
+    }
+
+    .step-content {
+        max-width: 85vw; /* Картка займає майже всю ширину */
+        background: rgba(255, 255, 255, 0.9); /* Робимо фон щільнішим для читабельності */
+    }
+
+    .prose-max {
+        padding: 0 20px;
+    }
+}
+
+/* Специфічно для мобільних (портретний режим) */
+@media (max-width: 768px) {
+    h1 { font-size: 1.8rem; }
+    h2 { font-size: 1.5rem; }
+
+    .sticky-viz {
+        height: 50vh; /* Зменшуємо висоту візуалізації, щоб звільнити місце для тексту */
+        top: 0;
+    }
+
+    .step {
+        min-height: 80vh; /* Коротші кроки, щоб швидше прокручувати */
+        align-items: flex-end; /* Текст "прилипає" до низу, щоб не перекривати центр карти */
+        padding-bottom: 5vh;
+        padding-left: 0;
+    }
+
+    .viz-container svg {
+        height: auto !important; /* Дозволяємо SVG масштабуватися */
+    }
+    
+    /* Сховуємо тултіпи на тач-екранах, бо вони заважають скролу, 
+       або робимо їх меншими */
+    #map-exclusive-tooltip {
+        display: none; 
+    }
+}
     </style>
 </head>
 <body>
@@ -626,59 +672,70 @@ async function initMap2() {
 }
 
 function drawSharesPies(year) {
+    if (!sharesData || sharesData.length === 0) return;
+
     const validData = sharesData.filter(d => countryCoords[d.Країна]);
 
     const countryGroups = gPies2.selectAll(".country-pie-group")
         .data(validData, d => d.Країна);
 
+    // Видаляємо ті, що більше не потрібні
+    countryGroups.exit().remove();
+
+    // Створюємо нові
     const countryEnter = countryGroups.enter()
         .append("g")
         .attr("class", "country-pie-group")
         .attr("transform", d => {
             const p = projection2(countryCoords[d.Країна]);
-            return `translate(${p[0]}, ${p[1]})`;
+            return p ? `translate(${p[0]}, ${p[1]})` : `translate(-100,-100)`;
         });
 
     const allGroups = countryEnter.merge(countryGroups);
 
-    // Оновлюємо шляхи (path) для КОЖНОЇ країни
     allGroups.each(function(d) {
-        const russianShare = +d[year];
+        // Отримуємо значення, перевіряємо чи воно числове
+        const rawValue = d[year] ? d[year].replace(',', '.') : "0";
+        const russianShare = Math.min(100, Math.max(0, parseFloat(rawValue) || 0));
+
         const pieData = [
             { label: "RU", value: russianShare, color: "#e31a1c" },
             { label: "Other", value: 100 - russianShare, color: "#dddddd" }
         ];
 
-        // Генеруємо дані для секторів
         const arcs = pieGenerator(pieData);
+        const group = d3.select(this);
 
-        // Вибираємо пати всередині поточної групи g
-        const paths = d3.select(this).selectAll("path")
-            .data(arcs);
+        const paths = group.selectAll("path")
+            .data(arcs, p => p.data.label);
 
         paths.join(
             enter => enter.append("path")
                 .attr("fill", p => p.data.color)
                 .attr("stroke", "#fff")
                 .attr("stroke-width", 0.5)
-                .each(function(p) { this._current = p; }) // Зберігаємо початковий стан
+                .each(function(p) { this._current = p; }) 
                 .attr("d", arcGenerator),
             update => update
+                .interrupt()
                 .transition()
-                .duration(750)
+                .duration(800)
+                .ease(d3.easeCubicInOut)
                 .attrTween("d", function(a) {
-                    // Анімація: перехід від старого стану (this._current) до нового (a)
+                    // Якщо _current з якихось причин зник, беремо поточне значення
+                    if (!this._current) this._current = a;
                     const i = d3.interpolate(this._current, a);
-                    this._current = i(0);
-                    return t => arcGenerator(i(t));
+                    return t => {
+                        this._current = i(t);
+                        return arcGenerator(this._current);
+                    };
                 })
         );
 
-        // Оновлюємо тултіп на самій групі g
-        d3.select(this)
-            .on("mouseover", function(event) {
+        // Оновлюємо події тултіпа
+        group.on("mouseover", function(event) {
                 mapTip.style("visibility", "visible")
-                    .html(`<b>${d.Країна}</b><br>Рік: ${year}<hr>Частка РФ: <strong>${russianShare}%</strong>`);
+                    .html(`<b>${d.Країна}</b><br>Рік: ${year}<hr>Частка РФ: <strong>${russianShare.toFixed(1)}%</strong>`);
             })
             .on("mousemove", function(event) {
                 mapTip.style("top", (event.pageY - 15) + "px")
@@ -687,9 +744,6 @@ function drawSharesPies(year) {
             .on("mouseout", () => mapTip.style("visibility", "hidden"));
     });
 }
-
-
-
 
 
 
@@ -728,8 +782,35 @@ function drawSharesPies(year) {
         }
     }
 
+
+    
+function resizeViz() {
+    const screenWidth = window.innerWidth;
+    
+    // Адаптуємо першу карту (РФ)
+    if (screenWidth < 768) {
+        mapProjection.scale(screenWidth * 0.8).translate([screenWidth / 2, 200]);
+    } else {
+        mapProjection.scale(1000 / 3.2).translate([500, 300]);
+    }
+
+    // Адаптуємо другу карту (Світ)
+    if (screenWidth < 768) {
+        projection2.scale(screenWidth / 4).translate([screenWidth / 2, 250]);
+        arcGenerator.outerRadius(screenWidth * 0.02); // Менші пироги для мобілок
+    } else {
+        projection2.scale(130*3).translate([400, 510]);
+        arcGenerator.outerRadius(10);
+    }
+
+    // Оновлюємо елементи, якщо вони вже існують
+    d3.select("#map-area-1 svg").attr("viewBox", `0 0 ${screenWidth < 768 ? screenWidth : 1000} 600`);
+}
+
     async function init() {
         try {
+            window.addEventListener("resize", resizeViz);
+            resizeViz();
             const rawData = await d3.csv("data/Infrastructure.csv");
             infrastructureData = rawData.map(d => {
                 const coordsArray = d["Координати (WGS84)"].split(",").map(Number);
@@ -753,7 +834,7 @@ function drawSharesPies(year) {
 
            scroller.setup({ 
                 step: "#scrolly-map-1 .step", // Додаємо ID першої карти
-                offset: 0.7, 
+                offset: window.innerWidth < 768 ? 0.5 : 0.7, 
                 debug: false 
             }).onStepEnter(handleStepEnter);
 
@@ -768,7 +849,7 @@ function drawSharesPies(year) {
 
             scroller2.setup({
                 step: "#scrolly-map-2 .map-2-step", // Використовуємо новий клас
-                offset: 0.7,
+                offset: window.innerWidth < 1000 ? 0.5 : 0.7,
                 debug: false
             }).onStepEnter(handleStepEnter2);
 
